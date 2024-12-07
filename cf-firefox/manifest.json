@@ -1,0 +1,35 @@
+{
+  "manifest_version": 2,
+  "name": "Cloudflare Cache Purger - CDN Cache Manager",
+  "version": "1.0.0",
+  "description": "Instantly purge Cloudflare CDN cache with one click. Perfect for developers and site admins to manage cache, improve performance, and update content quickly.",
+  "author": "Korben",
+  "homepage_url": "https://korben.info",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "https://api.cloudflare.com/*"
+  ],
+  "browser_action": {
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "default_popup": "popup/popup.html",
+    "default_title": "Cloudflare Cache Purger"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "browser_style": true
+  },
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "cloudflare-cache-purger@korben.info",
+      "strict_min_version": "57.0"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="options.css"/>
+</head>
+<body>
+  <div class="header">
+    <h1>Cloudflare Cache Purger Settings</h1>
+    <p class="subtitle">An extension by <a href="https://korben.info" target="_blank">Korben</a> to easily purge your Cloudflare cache</p>
+  </div>
+
+  <form id="options-form">
+    <div class="form-group">
+      <label for="zoneId">Cloudflare Zone ID</label>
+      <input type="text" id="zoneId" required>
+      <small>Your Cloudflare zone identifier</small>
+    </div>
+    
+    <div class="form-group">
+      <label for="apiToken">API Token</label>
+      <input type="password" id="apiToken" required>
+      <small>Your Cloudflare API token (Bearer token)</small>
+    </div>
+    
+    <button type="submit">Save</button>
+  </form>
+  <div id="message"></div>
+
+  <div class="footer">
+    <p class="love">Crafted with 🔥 by <a href="https://korben.info" target="_blank">Korben</a></p>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

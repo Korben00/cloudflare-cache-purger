@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Cloudflare Cache Purger",
+  "version": "1.0.0",
+  "description": "Easily purge Cloudflare cache for the current page or your entire zone. A Chrome extension by Korben.",
+  "author": "Korben",
+  "homepage_url": "https://korben.info",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.cloudflare.com/*"
+  ],
+  "action": {
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "default_popup": "popup/popup.html",
+    "default_title": "Cloudflare Cache Purger"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  }
+}

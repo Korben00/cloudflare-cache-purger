@@ -1,0 +1,33 @@
+{
+  "name": "cloudflare-cache-purger",
+  "version": "1.0.0",
+  "description": "Browser extension to easily purge Cloudflare cache",
+  "scripts": {
+    "build:chrome": "cd cf-chrome && web-ext build",
+    "build:firefox": "cd cf-firefox && web-ext build",
+    "build": "npm run build:chrome && npm run build:firefox",
+    "lint:chrome": "cd cf-chrome && web-ext lint",
+    "lint:firefox": "cd cf-firefox && web-ext lint",
+    "lint": "npm run lint:chrome && npm run lint:firefox"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Korben00/cloudflare-cache-purger.git"
+  },
+  "keywords": [
+    "cloudflare",
+    "cache",
+    "browser-extension",
+    "firefox",
+    "chrome"
+  ],
+  "author": "Korben",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Korben00/cloudflare-cache-purger/issues"
+  },
+  "homepage": "https://github.com/Korben00/cloudflare-cache-purger#readme",
+  "devDependencies": {
+    "web-ext": "^7.6.2"
+  }
+}

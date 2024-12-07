@@ -1,0 +1,19 @@
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers d'éditeur
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Fichiers de build
+web-ext-artifacts/
+*.xpi
+
+# Fichiers de développement
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
