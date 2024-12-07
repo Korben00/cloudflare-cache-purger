@@ -74,5 +74,6 @@ MIT License
 
 ## Credits
 
+- Extension author: Korben
+- Visit [Korben.info](https://korben.info)
 - Extension icon: [Fire icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/fire)
-- Extension author: Korben (korben.info)
