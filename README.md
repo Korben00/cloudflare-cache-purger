@@ -2,7 +2,11 @@
 
 A Firefox extension that allows you to easily purge Cloudflare cache for the current page or your entire zone.
 
-![Main Interface](screenshots/main-interface.png)
+📥 Download the extension:
+- [Firefox Add-on](https://addons.mozilla.org/en-US/firefox/addon/cloudflare-cache-purger/)
+- [Chrome Extension](https://chromewebstore.google.com/detail/cloudflare-cache-purger/cbjaocichnocnadbjcpfajjnnnijmloe)
+
+<img src="screenshots/main-interface.png" width="50%" alt="Main Interface">
 
 ## Features
 
@@ -14,17 +18,17 @@ A Firefox extension that allows you to easily purge Cloudflare cache for the cur
 
 ## Installation
 
-1. Install the extension from [addons.mozilla.org](https://addons.mozilla.org)
+1. Install the extension from your browser's store (links above)
 2. Click on the extension icon in the toolbar
 3. Go to the extension settings
 
-![Access Settings](screenshots/plugin-settings-access.png)
+<img src="screenshots/plugin-settings-access.png" width="50%" alt="Access Settings">
 
 4. Configure your Cloudflare credentials:
    - Cloudflare Zone ID
    - API Token (Bearer token)
 
-![Settings Interface](screenshots/plugin-settings.png)
+<img src="screenshots/plugin-settings.png" width="50%" alt="Settings Interface">
 
 ## How to get your credentials
 
@@ -35,14 +39,14 @@ A Firefox extension that allows you to easily purge Cloudflare cache for the cur
 
 2. API Token:
    - Go to "My Profile > API Tokens" on Cloudflare
-   ![Create Token Step 1](screenshots/create-token-step1.png)
+   <img src="screenshots/create-token-step1.png" width="50%" alt="Create Token Step 1">
    
    - Create a new token with "Zone.Cache Purge" permissions
-   ![Create Token Step 2](screenshots/create-token-step2.png)
-   ![Create Token Step 3](screenshots/create-token-step3.png)
+   <img src="screenshots/create-token-step2.png" width="50%" alt="Create Token Step 2">
+   <img src="screenshots/create-token-step3.png" width="50%" alt="Create Token Step 3">
    
    - Copy the generated token
-   ![Create Token Step 4](screenshots/create-token-step4.png)
+   <img src="screenshots/create-token-step4.png" width="50%" alt="Create Token Step 4">
 
 ## Usage
 
