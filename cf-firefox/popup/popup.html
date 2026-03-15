@@ -16,6 +16,16 @@
         <button id="purgePageResources">Purge Page Resources</button>
         <button id="purgeAll">Purge Entire Cache</button>
       </div>
+
+      <div class="tag-section">
+        <label for="tagInput">Purge by Cache-Tag</label>
+        <div class="tag-input-row">
+          <input type="text" id="tagInput" placeholder="css, js, html...">
+          <button id="purgeByTag">Purge</button>
+        </div>
+        <small>Comma-separated Cache-Tags (requires server-side Cache-Tag headers)</small>
+      </div>
+
       <div id="message"></div>
     </div>
 

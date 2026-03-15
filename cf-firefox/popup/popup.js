@@ -2,8 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const purgeCurrentPage = document.getElementById('purgeCurrentPage');
   const purgePageResources = document.getElementById('purgePageResources');
   const purgeAll = document.getElementById('purgeAll');
+  const purgeByTag = document.getElementById('purgeByTag');
+  const tagInput = document.getElementById('tagInput');
   const messageDiv = document.getElementById('message');
-  const allButtons = [purgeCurrentPage, purgePageResources, purgeAll];
+  const allButtons = [purgeCurrentPage, purgePageResources, purgeAll, purgeByTag];
 
   function showMessage(text, isError = false) {
     messageDiv.textContent = text;
@@ -203,6 +205,69 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge page resources error:', error);
+    } finally {
+      setButtonsLoading(false);
+    }
+  });
+
+  // Purge par Cache-Tags via l'API Cloudflare
+  async function purgeCacheByTags(tags) {
+    const config = await getConfig();
+
+    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiToken}`
+      },
+      body: JSON.stringify({ tags })
+    });
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
+      throw new Error(errorDetail);
+    }
+
+    if (!result || !result.success) {
+      const errorMessage = result?.errors?.[0]?.message || 'Unknown error occurred';
+      throw new Error(errorMessage);
+    }
+
+    return tags.length;
+  }
+
+  purgeByTag.addEventListener('click', async () => {
+    try {
+      const rawInput = tagInput.value.trim();
+      if (!rawInput) {
+        throw new Error('Please enter at least one cache tag');
+      }
+
+      // Parser les tags séparés par des virgules, supprimer les vides et espaces
+      const tags = rawInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+      if (tags.length === 0) {
+        throw new Error('Please enter at least one valid cache tag');
+      }
+
+      // Validation : max 30 tags par appel, max 1024 chars par tag
+      if (tags.length > 30) {
+        throw new Error('Maximum 30 tags per request');
+      }
+
+      const invalidTag = tags.find(t => t.length > 1024);
+      if (invalidTag) {
+        throw new Error(`Tag too long (max 1024 chars): "${invalidTag.substring(0, 50)}..."`);
+      }
+
+      setButtonsLoading(true);
+      const count = await purgeCacheByTags(tags);
+      showMessage(`Cache purged for ${count} tag(s): ${tags.join(', ')}`);
+    } catch (error) {
+      showMessage(error.message, true);
+      console.error('Purge by tag error:', error);
     } finally {
       setButtonsLoading(false);
     }
