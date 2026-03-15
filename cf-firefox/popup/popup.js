@@ -9,19 +9,34 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function validateUrl(url) {
+    // Vérifier la longueur maximale de l'URL avant le parsing
+    if (url.length > 2048) {
+      throw new Error('URL is too long');
+    }
+    let urlObj;
     try {
-      const urlObj = new URL(url);
-      // Vérifier que c'est une URL HTTP(S)
-      if (!['http:', 'https:'].includes(urlObj.protocol)) {
-        throw new Error('Only HTTP and HTTPS URLs are supported');
-      }
-      // Vérifier la longueur maximale de l'URL
-      if (url.length > 2048) {
-        throw new Error('URL is too long');
-      }
-      return true;
+      urlObj = new URL(url);
     } catch (error) {
       throw new Error('Invalid URL format: ' + error.message);
+    }
+    // Vérifier que c'est une URL HTTP(S) — en dehors du try/catch
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      throw new Error('Only HTTP and HTTPS URLs are supported');
+    }
+    return true;
+  }
+
+  function setButtonsLoading(loading) {
+    purgeCurrentPage.disabled = loading;
+    purgeAll.disabled = loading;
+    if (loading) {
+      purgeCurrentPage.dataset.originalText = purgeCurrentPage.textContent;
+      purgeAll.dataset.originalText = purgeAll.textContent;
+      purgeCurrentPage.textContent = 'Purging...';
+      purgeAll.textContent = 'Purging...';
+    } else {
+      purgeCurrentPage.textContent = purgeCurrentPage.dataset.originalText || 'Purge Current Page';
+      purgeAll.textContent = purgeAll.dataset.originalText || 'Purge Entire Cache';
     }
   }
 
@@ -63,11 +78,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(data)
       });
 
+      const result = await response.json().catch(() => null);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
+        throw new Error(errorDetail);
       }
 
-      const result = await response.json();
+      if (!result) {
+        throw new Error('Invalid response from Cloudflare API');
+      }
       
       if (result.success) {
         showMessage('Cache successfully purged!');
@@ -83,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   purgeCurrentPage.addEventListener('click', async () => {
     try {
+      setButtonsLoading(true);
       const tabs = await browser.tabs.query({ active: true, currentWindow: true });
       if (!tabs || tabs.length === 0) {
         throw new Error('No active tab found');
@@ -92,15 +113,24 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge current page error:', error);
+    } finally {
+      setButtonsLoading(false);
     }
   });
 
   purgeAll.addEventListener('click', async () => {
+    // Confirmation avant purge total — action destructrice
+    if (!confirm('Are you sure you want to purge the entire cache? This will affect all cached resources.')) {
+      return;
+    }
     try {
+      setButtonsLoading(true);
       await purgeCache();
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge all error:', error);
+    } finally {
+      setButtonsLoading(false);
     }
   });
 });

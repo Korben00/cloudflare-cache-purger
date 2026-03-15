@@ -29,8 +29,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function sanitizeInput(input) {
-    // Nettoyer les entrées de caractères dangereux
+    // Nettoyer les entrées de caractères dangereux (pour Zone ID uniquement)
     return input.trim().replace(/[<>'"]/g, '');
+  }
+
+  function sanitizeToken(input) {
+    // Le token API ne doit pas être altéré — on se contente de trim
+    return input.trim();
   }
   
   form.addEventListener('submit', async (e) => {
@@ -38,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     try {
       const zoneId = sanitizeInput(document.getElementById('zoneId').value);
-      const apiToken = sanitizeInput(document.getElementById('apiToken').value);
+      const apiToken = sanitizeToken(document.getElementById('apiToken').value);
 
       // Validation des entrées
       validateZoneId(zoneId);
@@ -49,32 +54,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error('All fields are required');
       }
 
-      // Verify token validity with rate limiting
-      const response = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiToken}`
-        }
-      });
+      // Verify token validity
+      let response;
+      try {
+        response = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`
+          }
+        });
+      } catch (e) {
+        throw new Error('Network error: unable to reach Cloudflare API. Check your connection.');
+      }
       
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
       
-      if (!result.success) {
-        throw new Error(result.errors?.[0]?.message || 'Invalid API token');
+      if (!result || !result.success) {
+        throw new Error(result?.errors?.[0]?.message || 'Invalid API token');
       }
 
       // Vérifier la validité du Zone ID
-      const zoneResponse = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiToken}`
-        }
-      });
+      let zoneResponse;
+      try {
+        zoneResponse = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`
+          }
+        });
+      } catch (e) {
+        throw new Error('Network error: unable to verify Zone ID. Check your connection.');
+      }
 
-      const zoneResult = await zoneResponse.json();
-      if (!zoneResult.success) {
+      const zoneResult = await zoneResponse.json().catch(() => null);
+      if (!zoneResult || !zoneResult.success) {
         throw new Error('Invalid Zone ID or insufficient permissions');
       }
       
