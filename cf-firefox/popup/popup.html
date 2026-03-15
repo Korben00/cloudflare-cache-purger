@@ -20,10 +20,20 @@
       <div class="tag-section">
         <label for="tagInput">Purge by Cache-Tag</label>
         <div class="tag-input-row">
-          <input type="text" id="tagInput" placeholder="css, js, html...">
+          <input type="text" id="tagInput" list="tagSuggestions" placeholder="css, js, html...">
           <button id="purgeByTag">Purge</button>
         </div>
-        <small>Comma-separated Cache-Tags (requires server-side Cache-Tag headers)</small>
+        <datalist id="tagSuggestions">
+          <option value="css">
+          <option value="js">
+          <option value="html">
+          <option value="image">
+          <option value="font">
+          <option value="video">
+          <option value="css, js">
+          <option value="css, js, html">
+        </datalist>
+        <small>Pick a tag or type comma-separated values (requires server-side Cache-Tag headers)</small>
       </div>
 
       <div id="message"></div>
