@@ -30,16 +30,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return true;
   }
 
-  // Transforme les URLs Cloudflare Image Resizing en URL d'image originale
-  // Ex: /cdn-cgi/image/width=1920,f=avif/path/img.png → /path/img.png
-  // Les images resizées ne peuvent pas être purgées directement via l'API
+  // Normalise les URLs avant purge :
+  // - /cdn-cgi/image/<params>/path → /path (Image Resizing : purger l'originale)
+  // - /cdn-cgi/* (RUM, challenges...) → null (endpoints internes non purgeables)
   function normalizeUrl(url) {
     try {
       const urlObj = new URL(url);
-      const cdnCgiMatch = urlObj.pathname.match(/^\/cdn-cgi\/image\/[^\/]+\/(.+)$/);
-      if (cdnCgiMatch) {
-        urlObj.pathname = '/' + cdnCgiMatch[1];
-        return urlObj.toString();
+      if (urlObj.pathname.startsWith('/cdn-cgi/')) {
+        // Image Resizing : extraire l'URL originale de l'image
+        const imageMatch = urlObj.pathname.match(/^\/cdn-cgi\/image\/[^\/]+\/(.+)$/);
+        if (imageMatch) {
+          urlObj.pathname = '/' + imageMatch[1];
+          return urlObj.toString();
+        }
+        // Autres endpoints /cdn-cgi/ (RUM, challenges...) : non purgeables
+        return null;
       }
     } catch {
       // Si l'URL est invalide, on la retourne telle quelle
@@ -208,6 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       const currentUrl = normalizeUrl(tab.url);
+      if (!currentUrl) {
+        throw new Error('This URL is a Cloudflare internal endpoint and cannot be purged');
+      }
       await purgeCache([currentUrl]);
     } catch (error) {
       showMessage(error.message, true);
@@ -235,8 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const resources = await getPageResources(tab.id);
-      // Normaliser les URLs (cdn-cgi/image → originale) et filtrer les HTTP(S) valides
-      const validUrls = [...new Set(resources.map(normalizeUrl))].filter(url => {
+      // Normaliser les URLs (cdn-cgi/image → originale), exclure les cdn-cgi non purgeables
+      const validUrls = [...new Set(resources.map(normalizeUrl).filter(Boolean))].filter(url => {
         try {
           const u = new URL(url);
           return ['http:', 'https:'].includes(u.protocol);
