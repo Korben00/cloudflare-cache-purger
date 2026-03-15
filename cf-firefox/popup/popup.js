@@ -7,9 +7,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const messageDiv = document.getElementById('message');
   const allButtons = [purgeCurrentPage, purgePageResources, purgeAll, purgeByTag];
 
-  function showMessage(text, isError = false) {
-    messageDiv.textContent = text;
+  function showMessage(text, isError = false, details = null) {
+    messageDiv.innerHTML = '';
     messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+
+    const textNode = document.createElement('span');
+    textNode.textContent = text;
+    messageDiv.appendChild(textNode);
+
+    // Afficher une liste détaillée (URLs purgées, etc.)
+    if (details && details.length > 0) {
+      const list = document.createElement('ul');
+      list.className = 'purge-details';
+      details.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        li.title = item;
+        list.appendChild(li);
+      });
+      messageDiv.appendChild(list);
+    }
   }
 
   function validateUrl(url) {
@@ -226,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const count = await purgeCacheBatch(validUrls);
-      showMessage(`${count} resource(s) purged successfully!`);
+      showMessage(`${count} resource(s) purged successfully!`, false, validUrls);
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge page resources error:', error);
