@@ -49,11 +49,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       validateZoneId(zoneId);
       validateApiToken(apiToken);
 
-      // Vérifier que les champs ne sont pas vides
-      if (!zoneId || !apiToken) {
-        throw new Error('All fields are required');
-      }
-
       // Verify token validity
       let response;
       try {

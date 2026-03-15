@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
     textNode.textContent = text;
     messageDiv.appendChild(textNode);
 
-    // Afficher une liste détaillée (URLs purgées, etc.)
     if (details && details.length > 0) {
       const list = document.createElement('ul');
       list.className = 'purge-details';
@@ -30,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function validateUrl(url) {
-    // Vérifier la longueur maximale de l'URL avant le parsing
     if (url.length > 2048) {
       throw new Error('URL is too long');
     }
@@ -40,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       throw new Error('Invalid URL format: ' + error.message);
     }
-    // Vérifier que c'est une URL HTTP(S) — en dehors du try/catch
     if (!['http:', 'https:'].includes(urlObj.protocol)) {
       throw new Error('Only HTTP and HTTPS URLs are supported');
     }
@@ -54,17 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const urlObj = new URL(url);
       if (urlObj.pathname.startsWith('/cdn-cgi/')) {
-        // Image Resizing : extraire l'URL originale de l'image
         const imageMatch = urlObj.pathname.match(/^\/cdn-cgi\/image\/[^\/]+\/(.+)$/);
         if (imageMatch) {
           urlObj.pathname = '/' + imageMatch[1];
           return urlObj.toString();
         }
-        // Autres endpoints /cdn-cgi/ (RUM, challenges...) : non purgeables
         return null;
       }
     } catch {
-      // Si l'URL est invalide, on la retourne telle quelle
+      // URL invalide → retournée telle quelle
     }
     return url;
   }
@@ -73,7 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
     allButtons.forEach(btn => {
       btn.disabled = loading;
       if (loading) {
-        btn.dataset.originalText = btn.textContent;
+        if (!btn.dataset.originalText) {
+          btn.dataset.originalText = btn.textContent;
+        }
         btn.textContent = 'Purging...';
       } else {
         btn.textContent = btn.dataset.originalText || btn.textContent;
@@ -92,7 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
           reject(new Error('Missing configuration. Please configure the extension in the options.'));
           return;
         }
-        // Vérifier le format des données de configuration
         if (!/^[a-f0-9]{32}$/i.test(config.zoneId)) {
           reject(new Error('Invalid Zone ID format in configuration'));
           return;
@@ -106,85 +102,78 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function purgeCache(urls = null) {
-    try {
-      const config = await getConfig();
-      
-      // Valider les URLs si fournies
-      if (urls) {
-        if (!Array.isArray(urls)) {
-          throw new Error('URLs must be provided as an array');
+  async function getActiveTab() {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
         }
-        urls.forEach(validateUrl);
-      }
-
-      const data = urls ? { files: urls } : { purge_everything: true };
-      
-      const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiToken}`
-        },
-        body: JSON.stringify(data)
+        if (!tabs || tabs.length === 0) {
+          reject(new Error('No active tab found'));
+          return;
+        }
+        resolve(tabs[0]);
       });
+    });
+  }
 
-      const result = await response.json().catch(() => null);
+  // Appel centralisé à l'API Cloudflare purge_cache
+  async function callPurgeApi(config, body) {
+    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiToken}`
+      },
+      body: JSON.stringify(body)
+    });
 
-      if (!response.ok) {
-        const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
-        throw new Error(errorDetail);
-      }
+    const result = await response.json().catch(() => null);
 
-      if (!result) {
-        throw new Error('Invalid response from Cloudflare API');
-      }
-      
-      if (result.success) {
-        showMessage('Cache successfully purged!');
-      } else {
-        const errorMessage = result.errors?.[0]?.message || 'Unknown error occurred';
-        throw new Error(errorMessage);
-      }
-    } catch (error) {
-      showMessage(error.message, true);
-      console.error('Purge cache error:', error);
+    if (!response.ok) {
+      const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
+      throw new Error(errorDetail);
     }
+
+    if (!result || !result.success) {
+      const errorMessage = result?.errors?.[0]?.message || 'Unknown error occurred';
+      throw new Error(errorMessage);
+    }
+
+    return result;
+  }
+
+  async function purgeUrls(urls) {
+    const config = await getConfig();
+    urls.forEach(validateUrl);
+    await callPurgeApi(config, { files: urls });
   }
 
   // Purge par batch de 30 URLs max (limite API Cloudflare)
-  async function purgeCacheBatch(urls) {
+  const BATCH_SIZE = 30;
+
+  async function purgeBatch(urls) {
     const config = await getConfig();
-    const BATCH_SIZE = 30;
-    let purgedCount = 0;
+    urls.forEach(validateUrl);
 
     for (let i = 0; i < urls.length; i += BATCH_SIZE) {
       const batch = urls.slice(i, i + BATCH_SIZE);
-      const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiToken}`
-        },
-        body: JSON.stringify({ files: batch })
-      });
-
-      const result = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
-        throw new Error(errorDetail);
-      }
-
-      if (!result || !result.success) {
-        const errorMessage = result?.errors?.[0]?.message || 'Unknown error occurred';
-        throw new Error(errorMessage);
-      }
-
-      purgedCount += batch.length;
+      await callPurgeApi(config, { files: batch });
     }
 
-    return purgedCount;
+    return urls.length;
+  }
+
+  async function purgeByTags(tags) {
+    const config = await getConfig();
+    await callPurgeApi(config, { tags });
+    return tags.length;
+  }
+
+  async function purgeEverything() {
+    const config = await getConfig();
+    await callPurgeApi(config, { purge_everything: true });
   }
 
   // Injecte un content script pour collecter toutes les ressources de la page
@@ -193,9 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
       target: { tabId },
       func: () => {
         const urls = new Set();
-        // La page elle-même
         urls.add(window.location.href);
-        // Toutes les ressources chargées (CSS, JS, images, fonts...)
         performance.getEntriesByType('resource').forEach(entry => {
           if (entry.name && entry.name.startsWith('http')) {
             urls.add(entry.name);
@@ -215,25 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
   purgeCurrentPage.addEventListener('click', async () => {
     try {
       setButtonsLoading(true);
-      const [tab] = await new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          resolve(tabs);
-        });
-      });
-      
-      if (!tab) {
-        throw new Error('No active tab found');
-      }
-      
+      const tab = await getActiveTab();
       const currentUrl = normalizeUrl(tab.url);
       if (!currentUrl) {
         throw new Error('This URL is a Cloudflare internal endpoint and cannot be purged');
       }
-      await purgeCache([currentUrl]);
+      await purgeUrls([currentUrl]);
+      showMessage('Cache successfully purged!');
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge current page error:', error);
@@ -245,20 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
   purgePageResources.addEventListener('click', async () => {
     try {
       setButtonsLoading(true);
-      const [tab] = await new Promise((resolve, reject) => {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          resolve(tabs);
-        });
-      });
-
-      if (!tab) {
-        throw new Error('No active tab found');
-      }
-
+      const tab = await getActiveTab();
       const resources = await getPageResources(tab.id);
       // Normaliser les URLs (cdn-cgi/image → originale), exclure les cdn-cgi non purgeables
       const validUrls = [...new Set(resources.map(normalizeUrl).filter(Boolean))].filter(url => {
@@ -272,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('No resources found on this page');
       }
 
-      const count = await purgeCacheBatch(validUrls);
+      const count = await purgeBatch(validUrls);
       showMessage(`${count} resource(s) purged successfully!`, false, validUrls);
     } catch (error) {
       showMessage(error.message, true);
@@ -282,34 +244,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Purge par Cache-Tags via l'API Cloudflare
-  async function purgeCacheByTags(tags) {
-    const config = await getConfig();
-
-    const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiToken}`
-      },
-      body: JSON.stringify({ tags })
-    });
-
-    const result = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
-      throw new Error(errorDetail);
-    }
-
-    if (!result || !result.success) {
-      const errorMessage = result?.errors?.[0]?.message || 'Unknown error occurred';
-      throw new Error(errorMessage);
-    }
-
-    return tags.length;
-  }
-
   purgeByTag.addEventListener('click', async () => {
     try {
       const rawInput = tagInput.value.trim();
@@ -317,16 +251,14 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error('Please enter at least one cache tag');
       }
 
-      // Parser les tags séparés par des virgules, supprimer les vides et espaces
       const tags = rawInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
 
       if (tags.length === 0) {
         throw new Error('Please enter at least one valid cache tag');
       }
 
-      // Validation : max 30 tags par appel, max 1024 chars par tag
-      if (tags.length > 30) {
-        throw new Error('Maximum 30 tags per request');
+      if (tags.length > BATCH_SIZE) {
+        throw new Error(`Maximum ${BATCH_SIZE} tags per request`);
       }
 
       const invalidTag = tags.find(t => t.length > 1024);
@@ -335,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       setButtonsLoading(true);
-      const count = await purgeCacheByTags(tags);
+      const count = await purgeByTags(tags);
       showMessage(`Cache purged for ${count} tag(s): ${tags.join(', ')}`);
     } catch (error) {
       showMessage(error.message, true);
@@ -346,13 +278,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   purgeAll.addEventListener('click', async () => {
-    // Confirmation avant purge total — action destructrice
     if (!confirm('Are you sure you want to purge the entire cache? This will affect all cached resources.')) {
       return;
     }
+    setButtonsLoading(true);
     try {
-      setButtonsLoading(true);
-      await purgeCache();
+      await purgeEverything();
+      showMessage('Cache successfully purged!');
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge all error:', error);
