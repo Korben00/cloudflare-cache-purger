@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
   const purgeCurrentPage = document.getElementById('purgeCurrentPage');
+  const purgePageResources = document.getElementById('purgePageResources');
   const purgeAll = document.getElementById('purgeAll');
   const messageDiv = document.getElementById('message');
+  const allButtons = [purgeCurrentPage, purgePageResources, purgeAll];
 
   function showMessage(text, isError = false) {
     messageDiv.textContent = text;
@@ -27,17 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function setButtonsLoading(loading) {
-    purgeCurrentPage.disabled = loading;
-    purgeAll.disabled = loading;
-    if (loading) {
-      purgeCurrentPage.dataset.originalText = purgeCurrentPage.textContent;
-      purgeAll.dataset.originalText = purgeAll.textContent;
-      purgeCurrentPage.textContent = 'Purging...';
-      purgeAll.textContent = 'Purging...';
-    } else {
-      purgeCurrentPage.textContent = purgeCurrentPage.dataset.originalText || 'Purge Current Page';
-      purgeAll.textContent = purgeAll.dataset.originalText || 'Purge Entire Cache';
-    }
+    allButtons.forEach(btn => {
+      btn.disabled = loading;
+      if (loading) {
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = 'Purging...';
+      } else {
+        btn.textContent = btn.dataset.originalText || btn.textContent;
+      }
+    });
   }
 
   async function getConfig() {
@@ -111,6 +111,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Purge par batch de 30 URLs max (limite API Cloudflare)
+  async function purgeCacheBatch(urls) {
+    const config = await getConfig();
+    const BATCH_SIZE = 30;
+    let purgedCount = 0;
+
+    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+      const batch = urls.slice(i, i + BATCH_SIZE);
+      const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiToken}`
+        },
+        body: JSON.stringify({ files: batch })
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const errorDetail = result?.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
+        throw new Error(errorDetail);
+      }
+
+      if (!result || !result.success) {
+        const errorMessage = result?.errors?.[0]?.message || 'Unknown error occurred';
+        throw new Error(errorMessage);
+      }
+
+      purgedCount += batch.length;
+    }
+
+    return purgedCount;
+  }
+
+  // Injecte un content script pour collecter toutes les ressources de la page
+  async function getPageResources(tabId) {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const urls = new Set();
+        // La page elle-même
+        urls.add(window.location.href);
+        // Toutes les ressources chargées (CSS, JS, images, fonts...)
+        performance.getEntriesByType('resource').forEach(entry => {
+          if (entry.name && entry.name.startsWith('http')) {
+            urls.add(entry.name);
+          }
+        });
+        return Array.from(urls);
+      }
+    });
+
+    if (!results || !results[0] || !results[0].result) {
+      throw new Error('Failed to collect page resources');
+    }
+
+    return results[0].result;
+  }
+
   purgeCurrentPage.addEventListener('click', async () => {
     try {
       setButtonsLoading(true);
@@ -133,6 +193,46 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       showMessage(error.message, true);
       console.error('Purge current page error:', error);
+    } finally {
+      setButtonsLoading(false);
+    }
+  });
+
+  purgePageResources.addEventListener('click', async () => {
+    try {
+      setButtonsLoading(true);
+      const [tab] = await new Promise((resolve, reject) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(tabs);
+        });
+      });
+
+      if (!tab) {
+        throw new Error('No active tab found');
+      }
+
+      const resources = await getPageResources(tab.id);
+      // Filtrer uniquement les URLs HTTP(S) valides
+      const validUrls = resources.filter(url => {
+        try {
+          const u = new URL(url);
+          return ['http:', 'https:'].includes(u.protocol);
+        } catch { return false; }
+      });
+
+      if (validUrls.length === 0) {
+        throw new Error('No resources found on this page');
+      }
+
+      const count = await purgeCacheBatch(validUrls);
+      showMessage(`${count} resource(s) purged successfully!`);
+    } catch (error) {
+      showMessage(error.message, true);
+      console.error('Purge page resources error:', error);
     } finally {
       setButtonsLoading(false);
     }
